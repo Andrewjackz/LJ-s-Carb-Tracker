@@ -72,6 +72,14 @@
     .icard{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
     .icard p{font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:8px}
     .warn{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:var(--t3);line-height:1.6}
+    .api-setup{background:var(--card);border-radius:14px;padding:16px;margin-bottom:12px;border:2px solid var(--g)}
+    .api-setup h3{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:6px}
+    .api-setup p{font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:10px}
+    .api-row{display:flex;gap:8px}
+    .api-in{flex:1;padding:10px 12px;background:var(--bg);border:1px solid var(--br);border-radius:10px;font-size:14px;color:var(--t1);outline:none;font-family:monospace}
+    .api-in:focus{border-color:var(--g)}
+    .api-btn{padding:10px 16px;background:var(--g);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}
+    .api-ok{font-size:12px;color:var(--g);margin-top:6px;display:none}
   </style>
 </head>
 <body>
@@ -130,7 +138,17 @@
   <!-- INFO -->
   <div class="panel" id="p-info">
     <div class="ipad">
-      <div class="slbl" style="padding-left:0;padding-top:4px">About</div>
+      <div class="slbl" style="padding-left:0;padding-top:4px">API Key</div>
+      <div class="api-setup">
+        <h3>🔑 Anthropic API Key</h3>
+        <p>This app uses the Anthropic AI directly. Enter your API key below — it's stored only on this device and never sent anywhere except Anthropic.</p>
+        <div class="api-row">
+          <input class="api-in" id="apiIn" type="password" placeholder="sk-ant-..." />
+          <button class="api-btn" onclick="saveKey()">Save</button>
+        </div>
+        <div class="api-ok" id="apiOk">✓ API key saved!</div>
+      </div>
+      <div class="slbl" style="padding-left:0">About</div>
       <div class="icard">
         <p>Carb Counter uses AI to estimate carbohydrates in any food or meal you describe. Simply type what you ate and the AI breaks it down item by item.</p>
         <p>All saved meals are stored locally on this device only.</p>
@@ -151,18 +169,57 @@ var saved=JSON.parse(localStorage.getItem('cc_meals')||'[]');
 var EM={rice:'🍚',bread:'🍞',pasta:'🍝',noodle:'🍜',apple:'🍎',banana:'🍌',potato:'🥔',carrot:'🥕',milk:'🥛',yogurt:'🍶',cheese:'🧀',cookie:'🍪',cake:'🎂',juice:'🥤',soda:'🥤',cereal:'🥣',oat:'🥣',bean:'🫘',corn:'🌽',tomato:'🍅',orange:'🍊',grape:'🍇',berry:'🍓',egg:'🥚',chicken:'🍗',beef:'🥩',fish:'🐟',salad:'🥗',sandwich:'🥪',pizza:'🍕',burger:'🍔',wrap:'🌯',soup:'🍜',fries:'🍟',taco:'🌮',waffle:'🧇',pancake:'🥞',muffin:'🧁',donut:'🍩',chocolate:'🍫',coffee:'☕',tea:'🍵',cracker:'🫙',peanut:'🥜',almond:'🌰',bagel:'🥯',popcorn:'🍿',broccoli:'🥦',spinach:'🥬',avocado:'🥑','ice cream':'🍦','sweet potato':'🍠',granola:'🥣',tortilla:'🌮',pretzel:'🥨'};
 function ge(n){var k=Object.keys(EM);for(var i=0;i<k.length;i++)if((n||'').toLowerCase().indexOf(k[i])!==-1)return EM[k[i]];return'🍽️';}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function goTab(n){['track','saved','info'].forEach(function(t){var on=t===n;document.getElementById('t-'+t).className='tab'+(on?' on':'');document.getElementById('p-'+t).className='panel'+(on?' on':'');});if(n==='saved')renderSaved();}
+function goTab(n){['track','saved','info'].forEach(function(t){var on=t===n;document.getElementById('t-'+t).className='tab'+(on?' on':'');document.getElementById('p-'+t).className='panel'+(on?' on':'');});if(n==='saved')renderSaved();if(n==='info')loadKeyDisplay();}
 function focusSave(){setTimeout(function(){document.getElementById('snIn').focus();},150);}
+
+function saveKey(){
+  var k=(document.getElementById('apiIn').value||'').trim();
+  if(!k){alert('Please enter your API key.');return;}
+  localStorage.setItem('cc_apikey',k);
+  var ok=document.getElementById('apiOk');
+  ok.style.display='block';
+  setTimeout(function(){ok.style.display='none';},3000);
+}
+function loadKeyDisplay(){
+  var k=localStorage.getItem('cc_apikey')||'';
+  if(k)document.getElementById('apiIn').value=k;
+}
+function getKey(){return localStorage.getItem('cc_apikey')||'';}
+
 function doLookup(){
   var inp=document.getElementById('fIn');
   var q=(inp.value||'').trim();
   if(!q){inp.focus();return;}
+  var key=getKey();
+  if(!key){
+    showErr('Please add your Anthropic API key in the Info tab first.');
+    goTab('info');
+    return;
+  }
   showErr(null);setLoad(true);
-  fetch('/.netlify/functions/lookup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})})
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-haiku-4-5-20251001',
+      max_tokens:1000,
+      system:'You are a nutrition assistant. When given a food or meal description, return ONLY a JSON array. Each item must have: name (string), serving (string, e.g. "1 cup"), carbs (number in grams). No markdown, no explanation, just the JSON array.',
+      messages:[{role:'user',content:'What are the carbs in: '+q}]
+    })
+  })
   .then(function(res){return res.json().then(function(d){return{ok:res.ok,status:res.status,d:d};});})
   .then(function(r){
     setLoad(false);
-    if(!r.ok){var m=(r.d&&r.d.error)?r.d.error:'Server error '+r.status;showErr(m);return;}
+    if(!r.ok){
+      var m=(r.d&&r.d.error&&r.d.error.message)?r.d.error.message:'API error '+r.status;
+      if(r.status===401)m='Invalid API key — please check the key in the Info tab.';
+      showErr(m);return;
+    }
     var txt=((r.d.content&&r.d.content[0]&&r.d.content[0].text)||'').replace(/```json|```/g,'').trim();
     var p;try{p=JSON.parse(txt);}catch(e){showErr('Could not read response — try rephrasing.');return;}
     if(!Array.isArray(p)||p.length===0){showErr('No items found — try being more specific.');return;}
@@ -209,7 +266,7 @@ function renderSaved(){
   l.innerHTML=h;
 }
 function nukeData(){if(!confirm('Delete ALL saved meals?'))return;saved=[];localStorage.removeItem('cc_meals');renderSaved();}
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(function(){});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(function(){});
 renderItems();renderSaved();
 </script>
 </body>
