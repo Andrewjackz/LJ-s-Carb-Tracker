@@ -4,7 +4,7 @@
   "description": "AI-powered carb tracker",
   "start_url": "/LJ-s-Carb-Tracker/",
   "scope": "/LJ-s-Carb-Tracker/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#1D9E75",
   "theme_color": "#1D9E75",
   "orientation": "portrait",
